@@ -11,7 +11,7 @@ For local communities, desertification is an immediate threat to food security, 
 
 ### MODIS/Terra+Aqua Land Cover Type Yearly L3 Global 500m SIN Grid V061 
 Source: Nasa  
-Link: https://www.earthdata.nasa.gov/data/catalog/lpcloud-mcd12q1-061
+Access Link: [https://www.earthdata.nasa.gov/data/catalog/lpcloud-mcd12q1-061](https://search.earthdata.nasa.gov/downloads/1930324634)
 
 For every year from 2001-2025 (ordinal), we have the following data:
 
