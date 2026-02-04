@@ -13,6 +13,8 @@ For local communities, desertification is an immediate threat to food security, 
 Source: Nasa  
 Link: https://www.earthdata.nasa.gov/data/catalog/lpcloud-mcd12q1-061
 
+For every year from 2001-2025 (ordinal), we have the following data:
+
 | Variable        | Data Type |
 |-----------------|-----------|
 | X (longitude) | continuous |
