@@ -48,7 +48,7 @@ For every year from 2000-2025 (ordinal), we have the following data:
 | X  | Latitude | continuous |
 | Y | Longitude | continuous |
 | LST_Day_6km | Day Land Surface Temperature | continuous |
-| LST_Night_6km | Night Land Surface Temperature | Night Land Surface Temperature |
+| LST_Night_6km | Night Land Surface Temperature | continuous |
 | Emis_31 | Band 31 emissivity useful for detecting shifts at desert margin | continuous |
 
 ## How to access data
