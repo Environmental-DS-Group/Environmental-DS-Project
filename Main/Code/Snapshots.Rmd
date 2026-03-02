@@ -269,7 +269,84 @@ ggsave("Images/CT_2024_08.png", plot = CT_2024_08_PLOT)
 
 ```
 
+## Senegal
 
+```{r}
 
+# Senegal Land Cover (h19v07): 2001, 2007, 2024
+
+## 2001
+SL_2001 <- "Data/LandCover.h16v07/LandCover.h16v07.2001.hdf"
+
+SL_2001_PLOT <- plot_landcover_snapshot(SL_2001, "Senegal Land Classification: 2001")
+
+# 2007
+SL_2007 <- "Data/LandCover.h16v07/LandCover.h16v07.2007.hdf"
+
+SL_2007_PLOT <- plot_landcover_snapshot(SL_2007, "Senegal Land Classification: 2007")
+
+## 2024
+SL_2024 <- "Data/LandCover.h16v07/LandCover.h16v07.2024.hdf"
+
+SL_2024_PLOT <- plot_landcover_snapshot(SL_2024, "Senegal Land Classification: 2024")
+
+## Save Snapshots
+ggsave("Images/SL_2001.png", plot = SL_2001_PLOT)
+ggsave("Images/SL_2007.png", plot = SL_2007_PLOT)
+ggsave("Images/SL_2024.png", plot = SL_2024_PLOT)
+
+```
+
+```{r}
+
+# Senegal Vegetation Index (h19v07): Aug 2001, 2007, 2024
+
+## AUG 2001
+SV_2001_08 <- "Data/Vegetation.h16v07/Vegetation.h16v07.2001.08.hdf"
+
+SV_2001_08_PLOT <- plot_vegetation_snapshot(SV_2001_08, "Senegal EVI: Aug 2001")
+
+## AUG 2007
+SV_2007_08 <- "Data/Vegetation.h16v07/Vegetation.h16v07.2007.08.hdf"
+
+SV_2007_08_PLOT <- plot_vegetation_snapshot(SV_2007_08, "Senegal EVI: Aug 2007")
+
+## AUG 2024
+SV_2024_08 <- "Data/Vegetation.h16v07/Vegetation.h16v07.2024.08.hdf"
+
+SV_2024_08_PLOT <- plot_vegetation_snapshot(SV_2024_08, "Senegal EVI: Aug 2024")
+
+## Save Snapshots
+ggsave("Images/SV_2001_08.png", plot = SV_2001_08_PLOT)
+ggsave("Images/SV_2007_08.png", plot = SV_2007_08_PLOT)
+ggsave("Images/SV_2024_08.png", plot = SV_2024_08_PLOT)
+
+```
+
+```{r}
+
+# Senegal Land Surface Temperature (h19v07): 2001, 2007, 2024
+
+## AUG 2001
+ST_2001_08 <- "Data/Temperature.h16v07/Temperature.h16v07.2001.08.hdf"
+
+ST_2001_08_PLOT <- plot_temp_snapshot(ST_2001_08, "Senegal LST: Aug 2001")
+
+## AUG 2007
+ST_2007_08 <- "Data/Temperature.h16v07/Temperature.h16v07.2007.08.hdf"
+
+ST_2007_08_PLOT <- plot_temp_snapshot(ST_2007_08, "Senegal LST: Aug 2007")
+
+## AUG 2024
+ST_2024_08 <- "Data/Temperature.h16v07/Temperature.h16v07.2024.08.hdf"
+
+ST_2024_08_PLOT <- plot_temp_snapshot(ST_2024_08, "Senegal LST: Aug 2024")
+
+## Save Snapshots
+ggsave("Images/ST_2001_08.png", plot = ST_2001_08_PLOT)
+ggsave("Images/ST_2007_08.png", plot = ST_2007_08_PLOT)
+ggsave("Images/ST_2024_08.png", plot = ST_2024_08_PLOT)
+
+```
 
 
