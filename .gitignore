@@ -1,2 +1,8 @@
-Main/Data/Raw/Temperature.h16v07/Temperature.h16v07.2000.11.hdf
-/Main
+# Ignore all satellite files anywhere in the project
+*.tif
+*.hdf
+*.TIF
+*.HDF
+
+# Ignore the contents of the Data folder but keep the folders
+Data/**/*

@@ -1,0 +1,185 @@
+---
+title: "Hovmoller"
+output: html_document
+---
+
+# Libraries
+
+```{r}
+
+# Libraries
+library(terra)
+library(ggplot2)
+
+```
+
+# Senegal
+
+```{r}
+
+# Collect files
+ndvi_files <- list.files("Data/Senegal/Vegetation/NDVI", pattern = "\\.08\\.tif$", full.names = TRUE)
+
+# Create an empty list to hold results
+hov_data_list <- list()
+
+for (file in ndvi_files) {
+  # Extract the year from the filename (e.g., "NDVI.h16.2001.08.tif" -> "2001")
+  year <- as.numeric(str_extract(basename(file), "\\d{4}"))
+  
+  # Load the raster
+  r <- rast(file)
+  
+  # Convert the spatial map into a massive raw dataframe (X, Y, Value)
+  df <- as.data.frame(r, xy = TRUE)
+  colnames(df)[3] <- "NDVI"
+  
+  df$Lat_Deg <- df$y / 111319.5
+  
+  # Round the Y coordinate (Latitude) for clean horizontal "slices"
+  # calculate the mean NDVI for every single slice.
+  row_means <- df %>%
+      mutate(Latitude_Slice = round(Lat_Deg, 1)) %>% 
+      group_by(Latitude_Slice) %>%
+      summarize(Mean_NDVI = mean(NDVI, na.rm = TRUE)) %>%
+      mutate(Year = year)
+  
+  # Save this year's slice data into list
+  hov_data_list[[as.character(year)]] <- row_means
+  print(paste("Processed Year:", year))
+}
+
+# Master dataframe
+master_hov_df <- bind_rows(hov_data_list)
+
+```
+
+```{r}
+
+start_year <- min(master_hov_df$Year)
+end_year   <- max(master_hov_df$Year)
+
+# Create diagram
+p_hov <- ggplot(master_hov_df, aes(x = Year, y = Latitude_Slice)) +
+  geom_raster(aes(fill = Mean_NDVI)) + 
+  # Sand -> Dry Grass -> Jungle
+  scale_fill_gradientn(
+    colors = c(
+    "#8c510a", # Brown (Desert)
+    "#f6e8c3", # Cream (Dry Transition)
+    "#78c679", # Light Green (Grassland)
+    "#00441b"  # Dark Green (Lush)
+  ),
+  oob = scales::squish,
+  limits = c(0, 0.8), # Locks the scale so colors don't shift
+  name = "Mean NDVI"
+  ) +
+  geom_contour(aes(z = Mean_NDVI), breaks = 0.2, color = "red", linewidth = 1) +
+  geom_contour(aes(z = Mean_NDVI), breaks = 0.45, color = "darkblue",linewidth = 0.8) +
+  labs(
+    title = "Sahara Expansion in Senegal (August 2001-2025)",
+    subtitle = "Red Line = Desert Boundary (<0.2) | Blue Dashed = Lush Zone (>0.45)",
+    x = "Year",
+    y = "Latitude (°N)"
+  ) +
+  scale_x_continuous(
+      breaks = seq(start_year, end_year, by = 1),
+      labels = seq(start_year, end_year, by = 1), 
+      expand = c(0, 0)
+      ) +
+  scale_y_continuous(expand = c(0, 0)) +
+  theme_bw() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    panel.grid = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+ggsave("Images/Diagrams/Hovmoller_Senegal_NDVI.png", plot = p_hov, width = 10, height = 6, dpi = 300)
+
+```
+
+# Chad
+
+```{r}
+
+# Collect files
+ndvi_files <- list.files("Data/Chad/Vegetation/NDVI", pattern = "\\.08\\.tif$", full.names = TRUE)
+
+# Create an empty list to hold results
+hov_data_list <- list()
+
+for (file in ndvi_files) {
+  year <- as.numeric(str_extract(basename(file), "\\d{4}"))
+  
+  # Load the raster
+  r <- rast(file)
+  
+  # Convert the spatial map into a massive raw dataframe (X, Y, Value)
+  df <- as.data.frame(r, xy = TRUE)
+  colnames(df)[3] <- "NDVI"
+  
+  df$Lat_Deg <- df$y / 111319.5
+  
+  # Round the Y coordinate (Latitude) for clean horizontal "slices"
+  # calculate the mean NDVI for every single slice.
+  row_means <- df %>%
+      mutate(Latitude_Slice = round(Lat_Deg, 1)) %>% 
+      group_by(Latitude_Slice) %>%
+      summarize(Mean_NDVI = mean(NDVI, na.rm = TRUE)) %>%
+      mutate(Year = year)
+  
+  # Save this year's slice data into list
+  hov_data_list[[as.character(year)]] <- row_means
+  print(paste("Processed Year:", year))
+}
+
+# Master dataframe
+master_hov_df <- bind_rows(hov_data_list)
+
+```
+
+```{r}
+
+start_year <- min(master_hov_df$Year)
+end_year   <- max(master_hov_df$Year)
+
+# Create diagram
+p_hov <- ggplot(master_hov_df, aes(x = Year, y = Latitude_Slice)) +
+  geom_raster(aes(fill = Mean_NDVI)) + 
+  # Sand -> Dry Grass -> Jungle
+  scale_fill_gradientn(
+    colors = c(
+    "#8c510a", # Brown (Desert)
+    "#f6e8c3", # Cream (Dry Transition)
+    "#78c679", # Light Green (Grassland)
+    "#00441b"  # Dark Green (Lush)
+  ),
+  oob = scales::squish,
+  limits = c(0, 0.8), # Locks the scale so colors don't shift
+  name = "Mean NDVI"
+  ) +
+  geom_contour(aes(z = Mean_NDVI), breaks = 0.2, color = "red", linewidth = 1) +
+  geom_contour(aes(z = Mean_NDVI), breaks = 0.45, color = "darkblue",linewidth = 0.8) +
+  labs(
+    title = "Sahara Expansion in Chad (August 2001-2025)",
+    subtitle = "Red Line = Desert Boundary (<0.2) | Blue Dashed = Lush Zone (>0.45)",
+    x = "Year",
+    y = "Latitude (°N)"
+  ) +
+  scale_x_continuous(
+      breaks = seq(start_year, end_year, by = 1),
+      labels = seq(start_year, end_year, by = 1), 
+      expand = c(0, 0)
+      ) +
+  scale_y_continuous(expand = c(0, 0)) +
+  theme_bw() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    panel.grid = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+ggsave("Images/Diagrams/Hovmoller_Chad_NDVI.png", plot = p_hov, width = 10, height = 6, dpi = 300)
+
+```

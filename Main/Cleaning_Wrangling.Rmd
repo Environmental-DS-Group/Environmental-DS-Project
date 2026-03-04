@@ -1,0 +1,154 @@
+---
+title: "Cleaning_Wrangling"
+output: html_document
+---
+
+This file focuses on converting the HDF files into easy to use and efficient TIFF files.
+
+The environment should look like this after running the code:
+
+Main
+/ Data
+// Chad
+-> LandCover
+-> Temperature (DAY/NIGHT)
+-> Vegetation (NDVI/EVI)
+// Senegal
+-> LandCover
+-> Temperature (DAY/NIGHT)
+-> Vegetation (NDVI/EVI)
+// Raw (HDF Files)
+
+```{r}
+
+terra_proj_path <- system.file("proj", package = "terra")
+
+# Ensure system uses this path specifically
+Sys.setenv(PROJ_LIB = terra_proj_path)
+Sys.setenv(PROJ_DATA = terra_proj_path)
+
+# Libraries
+library(terra)
+library(tidyverse)
+library(tidyterra)
+
+```
+
+```{r}
+
+# Function to sort tiles into respected country regions
+get_region <- function(filename) {
+  if (str_detect(filename, "16v07")) {
+    return("Senegal")
+  } else if (str_detect(filename, "19v07")) {
+    return("Chad")
+  } else {
+    return("Unknown_Region")
+  }
+}
+
+```
+
+
+```{r}
+
+# Creating folder for temperature (DAY/NIGHT)
+lst_files <- list.files("Data/Raw", pattern = "Temperature.*\\.hdf$", full.names = TRUE, recursive = TRUE)
+
+for (file in lst_files) {
+  region <- get_region(file)
+  base_name <- tools::file_path_sans_ext(basename(file))
+  
+  # Format: "Temperature.h16v07.2001.08" becomes "h16.2001.08"
+  clean_suffix <- base_name %>%
+    str_replace("Temperature\\.", "") %>%        
+    str_replace("h?(\\d{2})v\\d{2}", "h\\1") 
+  
+  # Dynamic paths for the two new subfolders
+  day_dir   <- file.path("Data", region, "Temperature", "Day")
+  night_dir <- file.path("Data", region, "Temperature", "Night")
+  
+  dir.create(day_dir, recursive = TRUE, showWarnings = FALSE)
+  dir.create(night_dir, recursive = TRUE, showWarnings = FALSE)
+  
+  # Extract and save Daytime LST
+  r_day <- sds(file)[1]
+  
+  day_path <- file.path(day_dir, paste0("Day.", clean_suffix, ".tif"))
+  writeRaster(r_day, day_path, overwrite = TRUE)
+  
+  # Extract and save nighttime LST
+  r_night <- sds(file)[5] 
+  
+  night_path <- file.path(night_dir, paste0("Night.", clean_suffix, ".tif"))
+  writeRaster(r_night, night_path, overwrite = TRUE)
+}
+
+```
+
+```{r}
+
+# Creating folder for vegetation (NDVI/EVI)
+veg_files <- list.files("Data/Raw", pattern = "Vegetation.*\\.hdf$", full.names = TRUE, recursive = TRUE)
+
+for (file in veg_files) {
+  region <- get_region(file)
+  base_name <- tools::file_path_sans_ext(basename(file))
+  
+  # Format: "Vegetation.h16v07.2001.08" becomes "h16.2001.08"
+  clean_suffix <- base_name %>%
+    str_replace("Vegetation\\.", "") %>%        
+    str_replace("h?(\\d{2})v\\d{2}", "h\\1") 
+  
+  # Dynamic paths for the two new subfolders
+  ndvi_dir <- file.path("Data", region, "Vegetation", "NDVI")
+  evi_dir  <- file.path("Data", region, "Vegetation", "EVI")
+  
+  dir.create(ndvi_dir, recursive = TRUE, showWarnings = FALSE)
+  dir.create(evi_dir, recursive = TRUE, showWarnings = FALSE)
+  
+  # Extract and save NDVI
+  r_ndvi <- sds(file)[1]
+  r_ndvi_scaled <- r_ndvi * 0.00000001 # Scale factor added to make NDVI/EVI -1 to 1
+  
+  ndvi_path <- file.path(ndvi_dir, paste0("NDVI.", clean_suffix, ".tif"))
+  writeRaster(r_ndvi_scaled, ndvi_path, overwrite = TRUE)
+  
+  # Extract and save EVI
+  r_evi <- sds(file)[2]
+  r_evi_scaled <- r_evi * 0.00000001
+  
+  evi_path <- file.path(evi_dir, paste0("EVI.", clean_suffix, ".tif"))
+  writeRaster(r_evi_scaled, evi_path, overwrite = TRUE)
+}
+
+```
+
+```{r}
+
+# Creating folder for land cover type
+lc_files <- list.files("Data/Raw", pattern = "LandCover.*\\.hdf$", full.names = TRUE, recursive = TRUE)
+
+for (file in lc_files) {
+  region <- get_region(file)
+  base_name <- tools::file_path_sans_ext(basename(file))
+  
+  # Format: "LandCover.h16v07.2001" becomes "h16.2001"
+  # NOTE: Land coverage is yearly
+  clean_suffix <- base_name %>%
+    str_replace("LandCover\\.", "") %>%        
+    str_replace("h?(\\d{2})v\\d{2}", "h\\1") 
+  
+  # Dynamic path for the Land Cover folder
+  lc_dir <- file.path("Data", region, "LandCover")
+  dir.create(lc_dir, recursive = TRUE, showWarnings = FALSE)
+  
+  # Extract and save land cover
+  r_lc <- sds(file)[1]
+  
+  lc_path <- file.path(lc_dir, paste0("LC.", clean_suffix, ".tif"))
+  writeRaster(r_lc, lc_path, datatype = "INT1U", overwrite = TRUE)
+}
+
+```
+
