@@ -76,6 +76,8 @@ p_hov <- ggplot(master_hov_df_senegal, aes(x = Year, y = Latitude_Slice)) +
   ) +
   geom_contour(aes(z = Mean_NDVI), breaks = 0.2, color = "red", linewidth = 1) +
   geom_contour(aes(z = Mean_NDVI), breaks = 0.45, color = "darkblue",linewidth = 0.8) +
+  annotate("text", x = 2013, y = 19, label = "SAHARA DESERT", color = "white", fontface = "bold", alpha = 0.6, size = 4) +
+  annotate("text", x = 2013, y = 11, label = "LUSH VEGETATION", color = "white", fontface = "bold", alpha = 0.6, size = 4) +
   labs(
     title = "Sahara Expansion in Senegal (August 2001-2025)",
     subtitle = "Red Line = Desert Boundary (<0.2) | Blue Dashed = Lush Zone (>0.45)",
@@ -161,6 +163,8 @@ p_hov <- ggplot(master_hov_df_chad, aes(x = Year, y = Latitude_Slice)) +
   ) +
   geom_contour(aes(z = Mean_NDVI), breaks = 0.2, color = "red", linewidth = 1) +
   geom_contour(aes(z = Mean_NDVI), breaks = 0.45, color = "darkblue",linewidth = 0.8) +
+  annotate("text", x = 2013, y = 19, label = "SAHARA DESERT", color = "white", fontface = "bold", alpha = 0.6, size = 4) +
+  annotate("text", x = 2013, y = 11, label = "LUSH VEGETATION", color = "white", fontface = "bold", alpha = 0.6, size = 4) +
   labs(
     title = "Sahara Expansion in Chad (August 2001-2025)",
     subtitle = "Red Line = Desert Boundary (<0.2) | Blue Dashed = Lush Zone (>0.45)",
