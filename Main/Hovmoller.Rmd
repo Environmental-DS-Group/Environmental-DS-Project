@@ -60,7 +60,7 @@ start_year <- min(master_hov_df_senegal$Year)
 end_year   <- max(master_hov_df_senegal$Year)
 
 # Create diagram
-p_hov <- ggplot(master_hov_df_senegal, aes(x = Year, y = Latitude_Slice)) +
+p_hov_senegal <- ggplot(master_hov_df_senegal, aes(x = Year, y = Latitude_Slice)) +
   geom_raster(aes(fill = Mean_NDVI)) + 
   # Sand -> Dry Grass -> Jungle
   scale_fill_gradientn(
@@ -97,7 +97,9 @@ p_hov <- ggplot(master_hov_df_senegal, aes(x = Year, y = Latitude_Slice)) +
     axis.text.x = element_text(angle = 45, hjust = 1)
   )
 
-ggsave("Images/Diagrams/Hovmoller_Senegal_NDVI.png", plot = p_hov, width = 10, height = 6, dpi = 300)
+ggsave("Images/Diagrams/Hovmoller_Senegal_NDVI.png", plot = p_hov_senegal, width = 10, height = 6, dpi = 300)
+
+p_hov_senegal
 
 ```
 
@@ -147,7 +149,7 @@ start_year <- min(master_hov_df_chad$Year)
 end_year   <- max(master_hov_df_chad$Year)
 
 # Create diagram
-p_hov <- ggplot(master_hov_df_chad, aes(x = Year, y = Latitude_Slice)) +
+p_hov_chad <- ggplot(master_hov_df_chad, aes(x = Year, y = Latitude_Slice)) +
   geom_raster(aes(fill = Mean_NDVI)) + 
   # Sand -> Dry Grass -> Jungle
   scale_fill_gradientn(
@@ -184,7 +186,9 @@ p_hov <- ggplot(master_hov_df_chad, aes(x = Year, y = Latitude_Slice)) +
     axis.text.x = element_text(angle = 45, hjust = 1)
   )
 
-ggsave("Images/Diagrams/Hovmoller_Chad_NDVI.png", plot = p_hov, width = 10, height = 6, dpi = 300)
+ggsave("Images/Diagrams/Hovmoller_Chad_NDVI.png", plot = p_hov_chad, width = 10, height = 6, dpi = 300)
+
+p_hov_chad
 
 ```
 
