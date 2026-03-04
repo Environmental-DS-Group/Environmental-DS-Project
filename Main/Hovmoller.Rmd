@@ -9,7 +9,7 @@ output: html_document
 
 # Libraries
 library(terra)
-library(ggplot2)
+library(tidyverse)
 
 ```
 
@@ -21,7 +21,7 @@ library(ggplot2)
 ndvi_files <- list.files("Data/Senegal/Vegetation/NDVI", pattern = "\\.08\\.tif$", full.names = TRUE)
 
 # Create an empty list to hold results
-hov_data_list <- list()
+hov_data_list_senegal <- list()
 
 for (file in ndvi_files) {
   # Extract the year from the filename (e.g., "NDVI.h16.2001.08.tif" -> "2001")
@@ -45,22 +45,22 @@ for (file in ndvi_files) {
       mutate(Year = year)
   
   # Save this year's slice data into list
-  hov_data_list[[as.character(year)]] <- row_means
+  hov_data_list_senegal[[as.character(year)]] <- row_means
   print(paste("Processed Year:", year))
 }
 
 # Master dataframe
-master_hov_df <- bind_rows(hov_data_list)
+master_hov_df_senegal <- bind_rows(hov_data_list_senegal)
 
 ```
 
 ```{r}
 
-start_year <- min(master_hov_df$Year)
-end_year   <- max(master_hov_df$Year)
+start_year <- min(master_hov_df_senegal$Year)
+end_year   <- max(master_hov_df_senegal$Year)
 
 # Create diagram
-p_hov <- ggplot(master_hov_df, aes(x = Year, y = Latitude_Slice)) +
+p_hov <- ggplot(master_hov_df_senegal, aes(x = Year, y = Latitude_Slice)) +
   geom_raster(aes(fill = Mean_NDVI)) + 
   # Sand -> Dry Grass -> Jungle
   scale_fill_gradientn(
@@ -107,7 +107,7 @@ ggsave("Images/Diagrams/Hovmoller_Senegal_NDVI.png", plot = p_hov, width = 10, h
 ndvi_files <- list.files("Data/Chad/Vegetation/NDVI", pattern = "\\.08\\.tif$", full.names = TRUE)
 
 # Create an empty list to hold results
-hov_data_list <- list()
+hov_data_list_chad <- list()
 
 for (file in ndvi_files) {
   year <- as.numeric(str_extract(basename(file), "\\d{4}"))
@@ -130,22 +130,22 @@ for (file in ndvi_files) {
       mutate(Year = year)
   
   # Save this year's slice data into list
-  hov_data_list[[as.character(year)]] <- row_means
+  hov_data_list_chad[[as.character(year)]] <- row_means
   print(paste("Processed Year:", year))
 }
 
 # Master dataframe
-master_hov_df <- bind_rows(hov_data_list)
+master_hov_df_chad <- bind_rows(hov_data_list_chad)
 
 ```
 
 ```{r}
 
-start_year <- min(master_hov_df$Year)
-end_year   <- max(master_hov_df$Year)
+start_year <- min(master_hov_df_chad$Year)
+end_year   <- max(master_hov_df_chad$Year)
 
 # Create diagram
-p_hov <- ggplot(master_hov_df, aes(x = Year, y = Latitude_Slice)) +
+p_hov <- ggplot(master_hov_df_chad, aes(x = Year, y = Latitude_Slice)) +
   geom_raster(aes(fill = Mean_NDVI)) + 
   # Sand -> Dry Grass -> Jungle
   scale_fill_gradientn(
@@ -183,3 +183,11 @@ p_hov <- ggplot(master_hov_df, aes(x = Year, y = Latitude_Slice)) +
 ggsave("Images/Diagrams/Hovmoller_Chad_NDVI.png", plot = p_hov, width = 10, height = 6, dpi = 300)
 
 ```
+
+# Combined Relative Expansion
+
+```{r}
+
+```
+
+
