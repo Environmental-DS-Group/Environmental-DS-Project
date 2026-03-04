@@ -1,0 +1,148 @@
+---
+title: "LST_NVDI_Correlation"
+output: html_document
+---
+
+# Libraries
+
+```{r}
+
+# Libraries
+library(terra)
+library(tidyverse)
+library(viridis)
+
+```
+
+# LST vs NVDI Correlation
+
+```{r}
+
+region <- c("Senegal", "Chad")
+
+# Function to create correlation data
+create_correlation_data <- function(region) {
+  # Define paths
+  ndvi_path <- file.path("Data", region, "Vegetation", "NDVI")
+  lst_path  <- file.path("Data", region, "Temperature", "Day")
+  
+  # Get August files for both
+  ndvi_files <- list.files(ndvi_path, pattern = "\\.08\\.tif$", full.names = TRUE)
+  lst_files  <- list.files(lst_path, pattern = "\\.08\\.tif$", full.names = TRUE)
+  
+  corr_list <- list()
+  
+  for (i in seq_along(ndvi_files)) {
+    year <- stringr::str_extract(basename(ndvi_files[i]), "\\d{4}")
+    
+    # Load both rasters
+    r_ndvi <- rast(ndvi_files[i])
+    r_lst  <- rast(lst_files[i])
+    
+    # Ensure they have the exact same extent/resolution
+    r_lst <- resample(r_lst, r_ndvi)
+    
+    # Convert to DF and merge
+    df_ndvi <- as.data.frame(r_ndvi, xy = TRUE)
+    df_lst  <- as.data.frame(r_lst, xy = TRUE)
+    
+    colnames(df_ndvi)[3] <- "NDVI"
+    colnames(df_lst)[3]  <- "LST_K" # MODIS LST is usually in Kelvin
+    
+    # Join by coordinates and convert Kelvin to Celsius
+    combined <- inner_join(df_ndvi, df_lst, by = c("x", "y")) %>%
+      mutate(LST_C = LST_K - 273.15,
+             Year = as.numeric(year),
+             Region = region) %>%
+      filter(NDVI > 0) # Remove water/noise
+    
+    # To keep the scatterplot from having 1 million points (which crashes R), 
+    # we take a random sample of 5000 points per year
+    corr_list[[year]] <- combined %>% sample_n(min(nrow(combined), 5000))
+  }
+  
+  return(bind_rows(corr_list))
+}
+
+senegal_corr <- create_correlation_data("Senegal")
+chad_corr    <- create_correlation_data("Chad")
+
+```
+
+```{r}
+
+# Triangle plot
+ggplot(senegal_corr, aes(x = LST_C, y = NDVI)) +
+  geom_bin2d(bins = 100) + 
+  scale_fill_viridis_c(option = "magma", name = "Point Density") +
+  geom_smooth(method = "lm", color = "cyan", linetype = "dashed") + # "Evaporative Cooling" slope
+  
+  labs(title = "LST vs. NDVI Correlation: Senegal",
+       subtitle = "Top-Left Corner = Desertified 'Hot-Dry' Zone",
+       x = "Land Surface Temperature (°C)",
+       y = "Vegetation Index (NDVI)") +
+  theme_bw()
+
+ggplot(chad_corr, aes(x = LST_C, y = NDVI)) +
+  geom_bin2d(bins = 100) + 
+  scale_fill_viridis_c(option = "magma", name = "Point Density") +
+  geom_smooth(method = "lm", color = "cyan", linetype = "dashed") + # "Evaporative Cooling" slope
+  
+  labs(title = "LST vs. NDVI Correlation: Chad",
+       subtitle = "Top-Left Corner = Desertified 'Hot-Dry' Zone",
+       x = "Land Surface Temperature (°C)",
+       y = "Vegetation Index (NDVI)") +
+  theme_bw()
+
+```
+
+```{r}
+
+# Merged correlations
+master_corr_df <- bind_rows(senegal_corr, chad_corr)
+
+master_corr_df$Region <- factor(master_corr_df$Region, levels = c("Senegal", "Chad"))
+
+```
+
+```{r}
+
+ggplot(master_corr_df, aes(x = LST_C, y = NDVI)) +
+  geom_point(alpha = 0.05, size = 0.5, color = "grey30") +
+  geom_density_2d(aes(color = ..level..), linewidth = 0.5) +
+  scale_color_viridis(option = "viridis", name = "Density Level") +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +
+  facet_wrap(~Region, scales = "fixed") + 
+  labs(
+    title = "Thermal-Vegetation Correlation: Senegal vs. Chad",
+    subtitle = "Higher LST at low NDVI indicates desertification",
+    x = "Land Surface Temperature (°C)",
+    y = "Vegetation Index (NDVI)"
+  ) +
+  theme_bw() +
+  theme(
+    strip.background = element_rect(fill = "grey90"),
+    strip.text = element_text(face = "bold", size = 12),
+    panel.grid.minor = element_blank()
+  ) +
+  scale_y_continuous(limits = c(0, 1))
+
+```
+
+```{r}
+
+border_lats <- master_hov_df %>%
+  filter(Mean_NDVI >= 0.19 & Mean_NDVI <= 0.21) %>%
+  group_by(Region) %>%
+  summarise(Avg_Border_Lat = mean(Latitude_Slice, na.rm = TRUE))
+
+master_corr_df <- master_corr_df %>%
+  left_join(border_lats, by = "Region") %>%
+  # Keep only data within 3 degrees of the Sahara border
+  filter(y >= (Avg_Border_Lat - 3) & y <= (Avg_Border_Lat + 3))
+
+```
+
+
+
+

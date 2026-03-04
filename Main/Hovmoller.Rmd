@@ -196,6 +196,135 @@ p_hov_chad
 
 ```{r}
 
+# Combine hovmoller data
+senegal_final <- master_hov_df_senegal %>% mutate(Region = "Senegal")
+chad_final    <- master_hov_df_chad %>% mutate(Region = "Chad")
+
+combined_hov <- bind_rows(senegal_final, chad_final)
+
 ```
+
+```{r}
+
+# Calculate yearly desert edge (NDVI ~ 0.2)
+edge_lats <- combined_hov %>%
+  # We use a small range (0.18 to 0.22) because a perfect 0.2000 might not exist
+  filter(Mean_NDVI >= 0.18 & Mean_NDVI <= 0.22) %>%
+  group_by(Year, Region) %>%
+  # Average the latitudes if multiple slices fall into that 0.18-0.22 range, 
+  # then round it to 1 decimal place so it perfectly matches our 0.1 grid
+  summarize(Edge_Lat = round(mean(Latitude_Slice, na.rm = TRUE), 1), .groups = "drop")
+
+# Take a peek at the results to make sure it worked!
+head(edge_lats)
+
+```
+
+```{r}
+
+# Create relative scale
+master_hov_relative <- combined_hov %>%
+  # 1. Attach the zero-line (Edge_Lat) to the main dataset
+  left_join(edge_lats, by = c("Year", "Region")) %>%
+  
+  # 2. The Shift: Calculate distance from the edge
+  mutate(Relative_Lat = round(Latitude_Slice - Edge_Lat, 1)) %>%
+  
+  # 3. Crop the viewing window to 4 degrees North and South of the edge
+  filter(Relative_Lat >= -6 & Relative_Lat <= 2) %>%
+  
+  # 4. Fill the gaps: Force R to create a row for every 0.1 slice in our window
+  group_by(Region, Year) %>%
+  complete(Relative_Lat = seq(-6, 2, by = 0.1)) %>%
+  # Interpolate any missing NDVI values created by the shifting window
+  mutate(Mean_NDVI = zoo::na.approx(Mean_NDVI, na.rm = FALSE)) %>%
+  # Patch the extreme top/bottom edges just in case
+  fill(Mean_NDVI, .direction = "downup") %>%
+  ungroup()
+
+# Check the new dataframe to ensure Relative_Lat goes from -4 to 4!
+head(master_hov_relative)
+
+```
+
+```{r}
+
+# Calculate lush edge (~0.45)
+lush_edge <- master_hov_relative %>%
+  filter(Mean_NDVI >= 0.70 & Mean_NDVI <= 1) %>%
+  group_by(Year, Region) %>%
+  summarize(Lush_Lat = mean(Relative_Lat, na.rm = TRUE), .groups = "drop")
+
+p_relative <- ggplot(master_hov_relative, aes(x = Year, y = Relative_Lat)) +
+  geom_tile(aes(fill = Mean_NDVI), width = 1, height = 0.1) +
+  
+  scale_fill_gradientn(
+    colors = c("#8c510a", "#f6e8c3", "#78c679", "#00441b"),
+    oob = scales::squish,
+    limits = c(0, 0.8),
+    name = "Mean NDVI"
+  ) +
+  
+  # The Desert Edge (Zero Line)
+  geom_hline(yintercept = 0, color = "red", linewidth = 1.2) +
+  
+  # The Lush Line (Using geom_smooth for a clean, flowing curve)
+  geom_smooth(data = lush_edge, aes(x = Year, y = Lush_Lat), 
+              method = "loess", span = 0.3, se = FALSE, 
+              color = "blue", linetype = "dashed", linewidth = 1) +
+  
+  # On-plot Annotations
+  annotate("text", x = 2013, y = 1.5, label = "SAHARA DESERT", color = "white", fontface = "bold", alpha = 0.8, size = 5) +
+  annotate("text", x = 2013, y = -3.5, label = "LUSH VEGETATION", color = "white", fontface = "bold", alpha = 0.8, size = 5) +
+  
+  # Split into Chad and Senegal panels
+  facet_wrap(~Region) +
+  
+  # Crop out the noisy top edge for Senegal
+  coord_cartesian(ylim = c(-6, 2)) +
+  
+  labs(
+    title = "Relative Sahara Expansion: Chad vs. Senegal",
+    subtitle = "Red Line = Desert Edge | Blue Dashed = Lush Vegetation Boundary",
+    x = "Year",
+    y = "Distance from Desert Border (°)"
+  ) +
+  
+  scale_x_continuous(breaks = seq(2000, 2025, 5), expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  
+  # Upgraded text sizing for export readability
+  theme_bw() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    panel.grid = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+p_relative
+
+```
+
+```{r}
+
+expansion_stats <- edge_lats %>%
+  group_by(Region) %>%
+  summarize(
+    # The slope (coefficient of Year) tells us how many degrees it moved per year
+    Degrees_Per_Year = coef(lm(Edge_Lat ~ Year))[2],
+    .groups = "drop"
+  ) %>%
+  mutate(
+    # Convert the degrees to miles (1 deg = ~69 miles)
+    # We use abs() to get the raw speed, since moving South means negative degrees
+    Miles_Per_Year = abs(Degrees_Per_Year * 69)
+  )
+
+# Print the final stats!
+print(expansion_stats)
+
+```
+
+
 
 
