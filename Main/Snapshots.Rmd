@@ -119,7 +119,7 @@ generate_snapshot <- function(region, year, month) {
     if (var_name %in% c("NDVI", "EVI")) {
       p <- p + geom_spatraster(data = r) +
         scale_fill_viridis_c(option = "viridis", name = var_name, na.value = "transparent") +
-        labs(title = paste(var_name, "-", region), subtitle = paste("August", year)) +
+        labs(title = paste("MODIS", var_name, ":", region), subtitle = paste("August", year)) +
         theme_bw() + 
         scale_x_continuous(expand = c(0, 0)) +
         scale_y_continuous(expand = c(0, 0))
@@ -129,7 +129,7 @@ generate_snapshot <- function(region, year, month) {
       r_celsius <- r - 273.15
       p <- p + geom_spatraster(data = r_celsius) +
         scale_fill_viridis_c(option = "magma", name = "Temp (°C)", na.value = "transparent") +
-        labs(title = paste(str_replace(var_name, "_", " "), "-", region), subtitle = paste("August", year)) +
+        labs(title = paste("MODIS", str_replace(var_name, "_", " "), ":", region), subtitle = paste("August", year)) +
         theme_bw() + 
         scale_x_continuous(expand = c(0, 0)) +
         scale_y_continuous(expand = c(0, 0))
@@ -146,7 +146,7 @@ generate_snapshot <- function(region, year, month) {
           na.translate = FALSE # Hides "NA" from clogging up your legend
         ) +
         
-        labs(title = paste("Land Cover -", region), subtitle = paste("Year", year)) +
+        labs(title = paste("MODIS Land Cover:", region), subtitle = paste(year)) +
         theme_bw() + 
         scale_x_continuous(expand = c(0, 0)) +
         scale_y_continuous(expand = c(0, 0))
