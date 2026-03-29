@@ -1,0 +1,237 @@
+---
+title: "Land_Cover_Comparison"
+output: html_document
+---
+
+# Libraries
+
+```{r}
+
+# Libraries
+library(terra)
+library(tidyverse)
+library(tidyterra)
+library(ggspatial)
+
+```
+
+# Select Path
+```{r}
+
+base_dir <- "Data/Senegal/LandCover" # Change to Chad when needed
+
+```
+
+# Trend Line
+
+## Prepare Files and Build Raster Stack
+
+```{r}
+
+# List all .tif files and extract years
+lc_files <- list.files(base_dir, pattern = "\\.tif$", full.names = TRUE)
+years <- as.numeric(regmatches(basename(lc_files), regexpr("[0-9]{4}", basename(lc_files))))
+
+# Create a dataframe to ensure files are sorted 
+file_df <- data.frame(File = lc_files, Year = years) %>% 
+  arrange(Year)
+
+# Load sorted files into multi-layer raster stack
+lc_stack <- rast(file_df$File)
+names(lc_stack) <- paste0("Y", file_df$Year) # Name layers Y2001, Y2002, etc.
+
+```
+
+## Exclude Water Pixels
+
+```{r}
+
+# Excludes any pixels that are/were water.
+
+# This boolean check creates a stack of TRUE/FALSE (1/0) for water presence
+water_check <- lc_stack == 17 | lc_stack == 0
+
+# Sum across all years (layers). If the sum is > 0, it was water at least once.
+water_sum <- sum(water_check, na.rm = TRUE)
+master_water_mask <- ifel(water_sum > 0, 1, 0)
+
+```
+
+## Isolating Barren Land
+
+```{r}
+
+# Set the master water pixels to NA across all layers in the stack
+lc_stack_masked <- ifel(master_water_mask == 1, NA, lc_stack)
+
+# Create a binary stack where Barren (16) = 1, and everything else = NA
+barren_stack <- ifel(lc_stack_masked == 16, 1, NA)
+
+```
+
+## Calculate Total Barren Land per Year
+
+```{r}
+
+barren_pixel_counts <- global(barren_stack, fun = "sum", na.rm = TRUE)
+
+# Converting from 500m to km^2
+pixel_area_km2 <- 0.25 
+
+trend_data <- data.frame(
+  Year = file_df$Year,
+  Barren_Pixels = barren_pixel_counts$sum
+  ) %>%
+  mutate(Area_km2 = Barren_Pixels * pixel_area_km2)
+
+print(trend_data)
+
+```
+
+## Generate Plot
+
+```{r}
+
+trend_plot <- ggplot(trend_data, aes(x = Year, y = Area_km2)) +
+  geom_line(color = "#d68d24", linewidth = 1.2) +
+  geom_point(color = "#c24f44", size = 3) +
+  geom_smooth(method = "lm", color = "black", linetype = "dashed", se = FALSE) +
+  scale_x_continuous(breaks = trend_data$Year) +
+  theme_bw() +
+  labs(
+    title = "Total Barren Area in Senegal: 2001-2024", # Dont forget to change title
+    x = "Year",
+    y = expression("Total Barren Area ("~km^2~")")
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(face = "bold", size = 14),
+    panel.grid.minor = element_blank()
+  )
+
+print(trend_plot)
+
+```
+
+## Save Output to Folder
+
+```{r}
+
+#output_filename <- file.path("Images/Diagrams", paste0("Barren_Land_Trendline_Senegal.png"))
+#ggsave(output_filename, plot = trend_plot, width = 8, height = 6, dpi = 300, bg = "white")
+
+#output_filename <- file.path("Images/Diagrams", paste0("Barren_Land_Trendline_Chad.png"))
+# ggsave(output_filename, plot = trend_plot, width = 8, height = 6, dpi = 300, bg = "white")
+
+```
+
+# Comparison Map 2001-2024
+
+## Select Start and End Year files
+
+```{r}
+
+early_idx <- 1
+late_idx <- nrow(file_df)
+
+start_year <- file_df$Year[early_idx]
+end_year <- file_df$Year[late_idx]
+
+r_early <- rast(file_df$File[early_idx])
+r_late <- rast(file_df$File[late_idx])
+
+```
+
+## Binary Change on Barren Class (16)
+```{r}
+
+# Create binary masks where Barren=1, Not Barren=0
+m_early_barren <- ifel(r_early == 16, 1, 0)
+m_late_barren <- ifel(r_late == 16, 1, 0)
+
+# 0  (0*10 + 0) -> Was Not Barren, Is Not Barren -> Stable Non-Desert
+# 1  (0*10 + 1) -> Was Not Barren, Is Barren -> Desertification
+# 10 (1*10 + 0) -> Was Barren, Is Not Barren -> Greening / Reversal
+# 11 (1*10 + 1) -> Was Barren, Is Barren -> Stable Desert
+
+change_raw <- (m_early_barren * 10) + m_late_barren
+
+```
+
+## Water Mask and Factorize
+
+```{r}
+
+# Apply the water mask (1 = water ever present, set to NA)
+change_map_masked <- ifel(master_water_mask == 1, NA, change_raw)
+
+# Factorize the raster
+change_map_factor <- as.factor(change_map_masked)
+
+# Define factor levels
+map_levels <- data.frame(
+  id = c(0, 1, 10, 11),
+  Category = c(
+    "Stable Non-Desert", 
+    "Desertification (New Desert)", 
+    "Greening (Reversal)", 
+    "Stable Desert"
+  )
+)
+
+levels(change_map_factor) <- map_levels
+
+```
+
+## Generate Plot
+
+```{r}
+
+region_name <- basename(dirname(base_dir)) 
+
+# Define a 4-color palette
+change_colors <- c(
+  "Stable Non-Desert" = "#e8ebd1",            # Pale, muted green/beige
+  "Stable Desert" = "#f5deb3",                # Sand/Wheat color
+  "Desertification (New Desert)" = "#cc0000", # Bold Red
+  "Greening (Reversal)" = "#009900"           # Bold Green
+)
+
+comp_map <- ggplot() +
+  geom_spatraster(data = change_map_factor) +
+  scale_fill_manual(
+    values = change_colors,
+    name = "Transition Type",
+    na.translate = FALSE 
+  ) +
+  coord_sf(crs = crs(change_map_factor)) + 
+  theme_bw() + 
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  labs(
+    title = paste0(region_name, " Region: Land Cover Dynamics"),
+    subtitle = paste("Comparison:", start_year, "vs", end_year),
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  annotation_scale(location = "bl", width_hint = 0.3) + 
+  annotation_north_arrow(location = "tr", which_north = "true") +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    legend.position = "right",
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.1)
+  )
+
+print(comp_map)
+
+```
+
+## Save Output
+
+```{r}
+
+output_filename_map <- file.path("Images/Diagrams", paste0(region_name, "_Change_Map_", start_year, "_", end_year, ".png"))
+ggsave(output_filename_map, plot = comp_map, width = 12, height = 8, dpi = 300, bg = "white")
+
+```
+

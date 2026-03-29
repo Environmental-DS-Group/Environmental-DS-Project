@@ -74,6 +74,92 @@ dir.create("Images/Snapshots", recursive = TRUE, showWarnings = FALSE)
 
 ```
 
+# Single Snapshot
+```{r}
+
+# Function to generate and view a single plot
+plot_single_snapshot <- function(region, variable, year, month = NULL) {
+  
+  # Set the MODIS tile based on the region
+  tile <- ifelse(region == "Senegal", "h16", "h19")
+  
+  # Construct the file path based on the selected variable
+  if (variable == "Land_Cover") {
+    file_path <- file.path("Data", region, "LandCover", paste0("LC.", tile, ".", year, ".tif"))
+    title_var <- "Land Cover"
+  } else if (variable %in% c("NDVI", "EVI")) {
+    if (is.null(month)) stop("Month is required for vegetation data (e.g., '08').")
+    file_path <- file.path("Data", region, "Vegetation", variable, paste0(variable, ".", tile, ".", year, ".", month, ".tif"))
+    title_var <- variable
+  } else if (variable == "Day_Temp") {
+    if (is.null(month)) stop("Month is required for temperature data (e.g., '08').")
+    file_path <- file.path("Data", region, "Temperature", "Day", paste0("Day.", tile, ".", year, ".", month, ".tif"))
+    title_var <- "Day Temperature"
+  } else if (variable == "Night_Temp") {
+    if (is.null(month)) stop("Month is required for temperature data (e.g., '08').")
+    file_path <- file.path("Data", region, "Temperature", "Night", paste0("Night.", tile, ".", year, ".", month, ".tif"))
+    title_var <- "Night Temperature"
+  } else {
+    stop("Invalid variable. Choose from: 'NDVI', 'EVI', 'Day_Temp', 'Night_Temp', 'Land_Cover'")
+  }
+  
+  # Check if the file exists
+  if (!file.exists(file_path)) {
+    stop(paste("File missing at path:", file_path))
+  }
+  
+  # Load the raster
+  r <- rast(file_path)
+  
+  # Initialize the plot
+  p <- ggplot()
+  
+  # Set the subtitle based on whether a month was provided
+  subtitle_text <- if(is.null(month)) paste(year) else paste("Month:", month, "| Year:", year)
+  
+  if (variable %in% c("NDVI", "EVI")) {
+    p <- p + geom_spatraster(data = r) +
+      scale_fill_viridis_c(option = "viridis", name = variable, na.value = "transparent")
+      
+  } else if (variable %in% c("Day_Temp", "Night_Temp")) {
+    r_celsius <- r - 273.15
+    p <- p + geom_spatraster(data = r_celsius) +
+      scale_fill_viridis_c(option = "magma", name = "Temp (°C)", na.value = "transparent")
+      
+  } else if (variable == "Land_Cover") {
+    
+    r_factor <- as.factor(r)
+    p <- p + geom_spatraster(data = r_factor) +
+      scale_fill_manual(
+        values = master_colors,
+        labels = master_labels,
+        name = "Land Cover Class",
+        na.translate = FALSE
+      )
+  }
+  
+  p <- p + 
+    labs(title = paste("MODIS", title_var, ":", region), subtitle = subtitle_text) +
+    theme_bw() + 
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0)) +
+    annotation_scale(location = "bl", width_hint = 0.3) + 
+    annotation_north_arrow(location = "tr", which_north = "true") +
+    theme(
+      axis.title = element_blank(),
+      axis.text  = element_blank(),
+      axis.ticks = element_blank()
+    )
+  
+  # Print the plot
+  print(p)
+}
+
+plot_single_snapshot(region = "Senegal", variable = "Land_Cover", year = "2002")
+#plot_single_snapshot(region = "Senegal", variable = "Land_Cover", year = "2016")
+
+```
+
 # Generate Snapshots
 
 ```{r}
@@ -173,7 +259,7 @@ generate_snapshot <- function(region, year, month) {
 
 ```{r}
 
-# Run loop for snapshots 2001, 2007, 2025
+# Run loop for snapshots 2001, 2007, 2024
 for (region in regions) {
   for (year in years) {
     generate_snapshot(region, year, month)
