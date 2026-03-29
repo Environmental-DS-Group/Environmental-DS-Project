@@ -99,8 +99,14 @@ plot_single_snapshot <- function(region, variable, year, month = NULL) {
     if (is.null(month)) stop("Month is required for temperature data (e.g., '08').")
     file_path <- file.path("Data", region, "Temperature", "Night", paste0("Night.", tile, ".", year, ".", month, ".tif"))
     title_var <- "Night Temperature"
+  } else if (variable == "Precipitation") {
+    if (is.null(month)) stop("Month is required for precipitation data (e.g., '04').")
+    # Notice this skips the 'tile' variable since IMERG files don't use it
+    file_path <- file.path("Data", region, "Precipitation", paste0("Precipitation.", year, ".", month, ".tif"))
+    title_var <- "Precipitation"
+    
   } else {
-    stop("Invalid variable. Choose from: 'NDVI', 'EVI', 'Day_Temp', 'Night_Temp', 'Land_Cover'")
+    stop("Invalid variable. Choose from: 'NDVI', 'EVI', 'Day_Temp', 'Night_Temp', 'Land_Cover', 'Precipitation'")
   }
   
   # Check if the file exists
@@ -125,7 +131,11 @@ plot_single_snapshot <- function(region, variable, year, month = NULL) {
     r_celsius <- r - 273.15
     p <- p + geom_spatraster(data = r_celsius) +
       scale_fill_viridis_c(option = "magma", name = "Temp (°C)", na.value = "transparent")
-      
+
+  } else if (variable == "Precipitation") {
+    p <- p + geom_spatraster(data = r) +
+      scale_fill_viridis_c(option = "mako", direction = -1, name = "Precip", na.value = "transparent")
+    
   } else if (variable == "Land_Cover") {
     
     r_factor <- as.factor(r)
@@ -155,8 +165,9 @@ plot_single_snapshot <- function(region, variable, year, month = NULL) {
   print(p)
 }
 
-plot_single_snapshot(region = "Senegal", variable = "Land_Cover", year = "2002")
+#plot_single_snapshot(region = "Senegal", variable = "Land_Cover", year = "2002")
 #plot_single_snapshot(region = "Senegal", variable = "Land_Cover", year = "2016")
+#plot_single_snapshot(region = "Senegal", variable = "Precipitation", year = "2011", month = "04")
 
 ```
 
