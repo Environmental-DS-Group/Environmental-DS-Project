@@ -1,0 +1,118 @@
+---
+title: "Violin_Plots"
+output: html_document
+---
+
+# Libraries
+
+```{r}
+
+library(terra)
+library(tidyverse)
+library(patchwork)
+
+```
+
+# Select Country, Year, and Month
+
+```{r}
+
+target_region <- "Chad"
+target_year <- "2024"
+target_month <- "08"
+tile <- ifelse(target_region == "Senegal", "h16", "h19")
+
+```
+
+# Define Path
+```{r}
+
+day_file  <- file.path("Data", target_region, "Temperature", "Day", paste0("Day.", tile, ".", target_year, ".", target_month, ".tif"))
+ndvi_file <- file.path("Data", target_region, "Vegetation", "NDVI", paste0("NDVI.", tile, ".", target_year, ".", target_month, ".tif"))
+lc_file   <- file.path("Data", target_region, "LandCover", paste0("LC.", tile, ".", target_year, ".tif"))
+
+```
+
+# Create Rasters and Stack
+```{r}
+
+r_day  <- rast(day_file) - 273.15   
+r_ndvi <- rast(ndvi_file)
+r_lc   <- rast(lc_file)
+
+# Resample continuous variables using bilinear interpolation
+r_day_aligned  <- resample(r_day, r_lc, method = "bilinear")
+r_ndvi_aligned <- resample(r_ndvi, r_lc, method = "bilinear")
+
+# Stack them together (r_lc is the anchor, remains unchanged)
+stack_all <- c(r_day_aligned, r_ndvi_aligned, r_lc)
+names(stack_all) <- c("Day_Temp", "NDVI", "LandCover")
+
+```
+
+# Extract Grassland and Barren Tiles
+```{r}
+
+full_pixel_df <- as.data.frame(stack_all, na.rm = TRUE)
+
+grass_barren <- c(
+  "10" = "Grasslands", "16" = "Desert (Barren)"
+)
+
+plot_df <- full_pixel_df %>%
+  # Map the numeric LandCover IDs to our text labels
+  mutate(LC_Label = grass_barren[as.character(LandCover)]) %>%
+  # Keep ONLY rows that successfully matched 'Grasslands' or 'Desert (Barren)'
+  filter(LC_Label %in% c("Grasslands", "Desert (Barren)")) %>%
+  # Drop NAs 
+  drop_na() %>%
+  # Reorder the factor
+  mutate(LC_Label = fct_reorder(LC_Label, NDVI, .desc = TRUE))
+
+```
+
+# Generate Plots
+```{r}
+
+# Color palette
+lc_colors <- c(
+  "Grasslands" = "#1a9850", # Healthy Green
+  "Desert (Barren)" = "#d73027" # Arid Red
+)
+
+# NDVI Distribution
+p_ndvi <- ggplot(plot_df, aes(x = LC_Label, y = NDVI, fill = LC_Label)) +
+  geom_violin(alpha = 0.8, color = "black", trim = FALSE) +
+  geom_boxplot(width = 0.15, fill = "white", color = "black", outlier.shape = NA, alpha = 0.4) +
+  scale_fill_manual(values = lc_colors) +
+  theme_bw() +
+  labs(title = "Vegetation Health (NDVI)", y = "NDVI Score") +
+  theme(axis.text.x = element_text(face = "bold", size = 12),
+        axis.title.x = element_blank(),
+        legend.position = "none")
+
+# Temperature Distribution
+p_temp <- ggplot(plot_df, aes(x = LC_Label, y = Day_Temp, fill = LC_Label)) +
+  geom_violin(alpha = 0.8, color = "black", trim = FALSE) +
+  geom_boxplot(width = 0.15, fill = "white", color = "black", outlier.shape = NA, alpha = 0.4) +
+  scale_fill_manual(values = lc_colors) +
+  theme_bw() +
+  labs(title = "Daytime Surface Temperature", y = "Temp (°C)") +
+  theme(axis.text.x = element_text(face = "bold", size = 12),
+        axis.title.x = element_blank(),
+        legend.position = "none")
+
+# Combine plots using patchwork
+final_plot <- p_ndvi + p_temp + 
+  plot_annotation(
+    title = paste(target_region, "Grasslands vs. Desert (Barren) in", target_year),
+    theme = theme(plot.title = element_text(face = "bold", size = 16))
+  )
+
+print(final_plot)
+
+output_filename <- file.path("Images/Diagrams", paste0(target_region, "_", "Violin", "_", target_year, target_month, ".png"))
+ggsave(output_filename, plot = final_plot, width = 8, height = 6, dpi = 300, bg = "white")
+
+```
+
