@@ -152,3 +152,59 @@ for (file in lc_files) {
 
 ```
 
+```{r}
+
+precip_dirs <- c("Data/Senegal/Precipitation", "Data/Chad/Precipitation")
+
+```
+
+```{r}
+
+for (dir_path in precip_dirs) {
+  
+  # Check if the directory actually exists first
+  if (!dir.exists(dir_path)) {
+    message("Directory not found, skipping: ", dir_path)
+    next
+  }
+  
+  # Find all files starting with "3B-MO"
+  old_files <- list.files(dir_path, pattern = "^3B-MO.*\\.tif(f)?$", full.names = TRUE)
+  
+  if (length(old_files) == 0) {
+    message("No IMERG files found to rename in: ", dir_path)
+    next
+  }
+  
+  # Loop through each file and rename it
+  for (old_file_path in old_files) {
+    
+    # Get just the filename (e.g., "3B-MO.MS.MRG.3IMERG.20110401-S000000...")
+    base_name <- basename(old_file_path)
+    
+    # Extract the 8-digit date string (YYYYMMDD) using regex
+    # It looks for exactly 8 consecutive numbers
+    date_string <- str_extract(base_name, "[0-9]{8}")
+    
+    if (!is.na(date_string)) {
+      # Pull out the Year (first 4 characters) and Month (next 2 characters)
+      year <- substr(date_string, 1, 4)
+      month <- substr(date_string, 5, 6)
+      
+      # Construct the new clean filename
+      new_name <- paste0("Precipitation.", year, ".", month, ".tif")
+      new_file_path <- file.path(dir_path, new_name)
+      
+      # Rename
+      file.rename(from = old_file_path, to = new_file_path)
+      print(paste("Success:", base_name, "->", new_name))
+      
+    } else {
+      warning(paste("Could not find a valid date in filename:", base_name))
+    }
+  }
+}
+
+```
+
+
