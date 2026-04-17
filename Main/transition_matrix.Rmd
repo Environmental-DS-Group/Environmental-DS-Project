@@ -1,0 +1,489 @@
+---
+title: "Transition Matrix"
+output: html_document
+date: "2026-04-17"
+---
+
+
+```{r}
+library(terra)
+library(gt)
+library(dplyr)
+library(stringr)
+library(expm)
+```
+
+```{r}
+# Load Data
+r <- rast("SenegalData.tif")
+
+# Add landCover for 2024
+lc_2024 <- rast("C:/Users/erikg/Downloads/desert_project/LandCover_Senegal/LC.h16.2024.tif")
+names(lc_2024) <- "LandCover_2024"
+r <- c(r, lc_2024)
+```
+
+Splitting Markov Matrix into before and after GGW
+```{r}
+# Get LandCover data only.
+lc_names <- names(r)[grepl("LandCover_", names(r))]
+r_lc <- r[[lc_names]]
+
+# Classes
+all_classes <- unique(r_lc) %>% 
+  as.vector() %>% 
+  unlist() %>% 
+  unique()
+all_classes <- sort(all_classes[!is.na(all_classes)])
+
+# Function subsetting data by year
+get_pooled_markov <- function(rast_stack, start_year, end_year, classes) {
+  n <- length(classes)
+  total_counts <- matrix(0, nrow = n, ncol = n, 
+                         dimnames = list(classes, classes))
+  
+  years <- start_year:(end_year - 1)
+  
+  for (y in years) {
+    layer_a <- paste0("LandCover_", y)
+    layer_b <- paste0("LandCover_", y + 1)
+    
+    if(layer_a %in% names(rast_stack) & layer_b %in% names(rast_stack)) {
+      ct <- crosstab(rast_stack[[c(layer_a, layer_b)]], long = FALSE)
+      
+      rows <- rownames(ct)
+      cols <- colnames(ct)
+      total_counts[rows, cols] <- total_counts[rows, cols] + as.matrix(ct)
+    }
+  }
+  
+  row_sums <- rowSums(total_counts)
+  matrix_prob <- total_counts / ifelse(row_sums == 0, 1, row_sums)
+  return(matrix_prob)
+}
+
+m1 <- get_pooled_markov(r_lc, 2001, 2007, all_classes)
+m2 <- get_pooled_markov(r_lc, 2008, 2024, all_classes)
+
+# Display
+render_pretty_matrix <- function(mat, title) {
+  as.data.frame(mat) %>%
+    mutate(From = rownames(.)) %>%
+    relocate(From) %>%
+    gt() %>%
+    tab_header(title = md(paste0("**", title, "**"))) %>%
+    fmt_number(columns = -From, decimals = 4) %>%
+    data_color(
+      columns = -From,
+      palette = "viridis", # Professional scientific palette
+      alpha = 0.8
+    ) %>%
+    tab_options(table.font.size = "small")
+}
+
+# Generate Results
+render_pretty_matrix(m1, "Annual Transitions (2001-2007)")
+render_pretty_matrix(m2, "Annual Transitions (2008-2024)")
+```
+
+Getting annual transitions
+```{r}
+library(terra)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+years_start <- 2001:2023
+
+annual_transitions_long <- lapply(years_start, function(y) {
+  
+  layer_a <- paste0("LandCover_", y)
+  layer_b <- paste0("LandCover_", y + 1)
+  
+  ct <- crosstab(r_lc[[c(layer_a, layer_b)]], long = TRUE)
+  
+  colnames(ct) <- c("From", "To", "Count")
+  
+  ct <- ct %>%
+    group_by(From) %>%
+    mutate(Prob = Count / sum(Count, na.rm = TRUE)) %>%
+    ungroup() %>%
+    mutate(Year = y)
+  
+  return(ct)
+}) %>% bind_rows()
+
+annual_transitions_long <- annual_transitions_long %>%
+  mutate(Prob = replace_na(Prob, 0))
+```
+
+Edited to only two states: desert and green
+Green includes all types of forest, shrubland, savanna, grassland, wetland, cropland and natural mosaic.
+```{r}
+# Desert mapped from 16 to 1
+# Green mapped from (1-12 and 14) to 2
+rcl_matrix <- matrix(c(
+  15, 16, 1,
+  1, 13, 2,
+  13,  14, 2
+), ncol = 3, byrow = TRUE)
+
+# Reclassifying
+r_binary <- classify(r_lc[[1]], rcl_matrix, others = NA)
+
+
+freq(r_binary)
+freq(r_lc[[2]])
+
+
+names(r_binary) <- names(r_lc)
+
+
+# Transitions
+years_start <- 2001:2023 
+
+total_counts <- matrix(0, nrow = 2, ncol = 2, 
+                       dimnames = list(c("1", "2"), c("1", "2")))
+
+for (y in years_start) {
+  layer_a <- paste0("LandCover_", y)
+  layer_b <- paste0("LandCover_", y + 1)
+  
+  ct <- crosstab(r_binary[[c(layer_a, layer_b)]], long = FALSE)
+  
+  ct_mat <- as.matrix(ct)
+  
+  existing_rows <- intersect(rownames(ct_mat), rownames(total_counts))
+  existing_cols <- intersect(colnames(ct_mat), colnames(total_counts))
+  
+  if(length(existing_rows) > 0 && length(existing_cols) > 0) {
+    total_counts[existing_rows, existing_cols] <- total_counts[existing_rows, existing_cols] + ct_mat[existing_rows, existing_cols]
+  }
+}
+
+
+markov_final <- prop.table(total_counts, margin = 1)
+
+rownames(markov_final) <- c("Barren", "Green")
+colnames(markov_final) <- c("Barren", "Green")
+
+
+
+
+
+as.data.frame(markov_final) %>%
+  mutate(From = rownames(.)) %>%
+  relocate(From) %>%
+  gt() %>%
+  tab_header(
+    title = md("**Senegal: Barren vs. Green Transitions**"),
+    subtitle = "Annualized Probabilities (Pooled 2001-2024)"
+  ) %>%
+  fmt_number(columns = -From, decimals = 5) %>%
+  cols_label(From = "Starting State") %>%
+  data_color(
+    columns = -From,
+    palette = c("#f4a582", "#92c5de")
+  )
+```
+Senegal: Barren vs. Green Transitions
+Annualized Probabilities (Pooled 2001-2024)
+Starting State	Barren	Green
+Barren	0.98781	0.01219
+Green	0.00404	0.99596
+
+
+Splitting into before and after GGW
+```{r}
+pre_ggw <- 2001:2006
+post_ggw  <- 2008:2023
+
+calculate_markov <- function(years, stack) {
+  total_counts <- matrix(0, nrow = 2, ncol = 2, dimnames = list(c("1", "2"), c("1", "2")))
+  
+  for (y in years) {
+    layer_t1 <- paste0("LandCover_", y)
+    layer_t2 <- paste0("LandCover_", y + 1)
+    
+    ct <- crosstab(stack[[c(layer_t1, layer_t2)]], long = FALSE)
+    ct_mat <- as.matrix(ct)
+    
+    rows <- intersect(rownames(ct_mat), rownames(total_counts))
+    cols <- intersect(colnames(ct_mat), colnames(total_counts))
+    
+    if(length(rows) > 0 && length(cols) > 0) {
+      total_counts[rows, cols] <- total_counts[rows, cols] + ct_mat[rows, cols]
+    }
+  }
+  
+  m_prob <- prop.table(total_counts, margin = 1)
+  
+  rownames(m_prob) <- c("Desert", "Vegetated")
+  colnames(m_prob) <- c("Desert", "Vegetated")
+  
+  return(m_prob)
+}
+
+# 3. Execute the calculations
+matrix_01_07 <- calculate_markov(pre_ggw, r_binary)
+matrix_08_24 <- calculate_markov(post_ggw, r_binary)
+
+# 4. Display the results
+print("--- Transition Matrix: 2001 to 2007 ---")
+print(round(matrix_01_07, 5))
+
+print("--- Transition Matrix: 2008 to 2024 ---")
+print(round(matrix_08_24, 5))
+```
+CHAD
+[1] "--- Transition Matrix: 2001 to 2007 ---"
+           Desert Vegetated
+Desert    0.99587   0.00413
+Vegetated 0.00404   0.99596
+[1] "--- Transition Matrix: 2008 to 2024 ---"
+           Desert Vegetated
+Desert    0.99768   0.00232
+Vegetated 0.00259   0.99741
+
+SENEGAL
+[1] "--- Transition Matrix: 2001 to 2007 ---"
+           Desert Vegetated
+Desert    0.98108   0.01892
+Vegetated 0.00377   0.99623
+[1] "--- Transition Matrix: 2008 to 2024 ---"
+           Desert Vegetated
+Desert    0.98982   0.01018
+Vegetated 0.00407   0.99593
+
+
+
+Now working with data split into populated and unpopulated.
+Unpopulated defined by having less than 1 person per sq k.
+```{r}
+
+r_all <- rast("C:/Users/erikg/Downloads/desert_project/SenegalData.tif")
+
+pop_layers <- r_all[[str_detect(names(r_all), "Pop")]]
+lc_layers  <- r_all[[str_detect(names(r_all), "LandCover")]]
+
+# Desert mapped from 16 to 1
+# Green mapped from (1-12 and 14) to 2
+rcl_matrix <- matrix(c(
+  15, 16, 1,
+  1,  13, 2,
+  13, 14, 2
+), ncol = 3, byrow = TRUE)
+
+lc_binary <- classify(lc_layers, rcl_matrix, others = NA)
+
+
+counts_pop   <- matrix(0, 2, 2, dimnames = list(c("1", "2"), c("1", "2")))
+counts_unpop <- matrix(0, 2, 2, dimnames = list(c("1", "2"), c("1", "2")))
+
+# Going from 2001-2020 since no data for pop past 2020
+years <- 2001:2019
+
+for (y in years) {
+  cat("Analyzing transition:", y, "to", y+1, "\n")
+  
+  t1_name <- names(lc_binary)[str_detect(names(lc_binary), as.character(y))]
+  t2_name <- names(lc_binary)[str_detect(names(lc_binary), as.character(y+1))]
+  pop_name <- names(pop_layers)[str_detect(names(pop_layers), as.character(y))]
+  
+  is_populated <- classify(pop_layers[[pop_name]], matrix(c(-Inf, 1, 0, 1, Inf, 1), ncol=3, byrow=TRUE))
+  
+  pair_pop   <- mask(lc_binary[[c(t1_name, t2_name)]], is_populated, maskvalues = 0)
+  pair_unpop <- mask(lc_binary[[c(t1_name, t2_name)]], is_populated, maskvalues = 1)
+  
+  ct_p <- as.matrix(crosstab(pair_pop, long = FALSE))
+  ct_u <- as.matrix(crosstab(pair_unpop, long = FALSE))
+  
+  p_rows <- intersect(rownames(ct_p), rownames(counts_pop))
+  p_cols <- intersect(colnames(ct_p), colnames(counts_pop))
+  if(length(p_rows) > 0) {
+    counts_pop[p_rows, p_cols] <- counts_pop[p_rows, p_cols] + ct_p[p_rows, p_cols]
+  }
+  
+  u_rows <- intersect(rownames(ct_u), rownames(counts_unpop))
+  u_cols <- intersect(colnames(ct_u), colnames(counts_unpop))
+  if(length(u_rows) > 0) {
+    counts_unpop[u_rows, u_cols] <- counts_unpop[u_rows, u_cols] + ct_u[u_rows, u_cols]
+  }
+}
+
+# Final Markov tables
+matrix_pop   <- prop.table(counts_pop, margin = 1)
+matrix_unpop <- prop.table(counts_unpop, margin = 1)
+
+final_names <- list(c("Desert", "Vegetated"), c("Desert", "Vegetated"))
+dimnames(matrix_pop) <- final_names
+dimnames(matrix_unpop) <- final_names
+
+print("--- POPULATED MATRIX ---")
+print(matrix_pop)
+print("--- UNPOPULATED MATRIX (<= 1) ---")
+print(matrix_unpop)
+```
+SENEGAL
+[1] "--- POPULATED MATRIX ---"
+               Desert  Vegetated
+Desert    0.962225541 0.03777446
+Vegetated 0.003405999 0.99659400
+[1] "--- UNPOPULATED MATRIX (<= 1) ---"
+              Desert   Vegetated
+Desert    0.99569961 0.004300393
+Vegetated 0.09252181 0.907478192
+
+CHAD
+[1] "--- POPULATED MATRIX ---"
+               Desert  Vegetated
+Desert    0.981899772 0.01810023
+Vegetated 0.002858369 0.99714163
+[1] "--- UNPOPULATED MATRIX (<= 1) ---"
+              Desert    Vegetated
+Desert    0.99961719 0.0003828119
+Vegetated 0.06441232 0.9355876754
+
+
+
+
+The code is lost, but this is the result of splitting by both time period and population.
+
+Senegal
+--- PERIOD 1: 2001-2007 ---
+[1] "POPULATED:"
+           Desert Vegetated
+Desert    0.94517   0.05483
+Vegetated 0.00314   0.99686
+[1] "UNPOPULATED:"
+           Desert Vegetated
+Desert    0.99469   0.00531
+Vegetated 0.07048   0.92952
+
+--- PERIOD 2: 2008-2020 ---
+[1] "POPULATED:"
+           Desert Vegetated
+Desert    0.97287   0.02713
+Vegetated 0.00356   0.99644
+[1] "UNPOPULATED:"
+           Desert Vegetated
+Desert    0.99631   0.00369
+Vegetated 0.10368   0.89632
+
+
+CHAD
+--- PERIOD 1: 2001-2007 ---
+[1] "POPULATED:"
+           Desert Vegetated
+Desert    0.96258   0.03742
+Vegetated 0.00361   0.99639
+[1] "UNPOPULATED:"
+           Desert Vegetated
+Desert    0.99948   0.00052
+Vegetated 0.04903   0.95097
+
+--- PERIOD 2: 2008-2020 ---
+[1] "POPULATED:"
+           Desert Vegetated
+Desert    0.98770   0.01230
+Vegetated 0.00243   0.99757
+[1] "UNPOPULATED:"
+           Desert Vegetated
+Desert    0.99971   0.00029
+Vegetated 0.09521   0.90479
+
+
+40 year projection
+```{r}
+current_country <- "Senegal" # Change to "Chad" or "Senegal" as needed
+
+results_senegal <- list(
+  Populated = matrix(
+    c(0.962225541, 0.03777446, 0.003405999, 0.99659400), 
+    nrow = 2, byrow = TRUE,
+    dimnames = list(c("Desert", "Vegetated"), c("Desert", "Vegetated"))
+  ),
+  Unpopulated = matrix(
+    c(0.99569961, 0.004300393, 0.09252181, 0.907478192), 
+    nrow = 2, byrow = TRUE,
+    dimnames = list(c("Desert", "Vegetated"), c("Desert", "Vegetated"))
+  )
+)
+
+results_chad <- list(
+  Populated = matrix(
+    c(0.981899772, 0.01810023, 0.002858369, 0.99714163), 
+    nrow = 2, byrow = TRUE,
+    dimnames = list(c("Desert", "Vegetated"), c("Desert", "Vegetated"))
+  ),
+  Unpopulated = matrix(
+    c(0.99961719, 0.0003828119, 0.06441232, 0.9355876754), 
+    nrow = 2, byrow = TRUE,
+    dimnames = list(c("Desert", "Vegetated"), c("Desert", "Vegetated"))
+  )
+)
+
+# picking the right country's results
+results_late <- if (current_country == "Senegal") results_senegal else results_chad
+
+
+r_all <- rast(paste0("C:/Users/erikg/Downloads/desert_project/", current_country, "Data.tif"))
+
+pop_layers <- r_all[[str_detect(names(r_all), "Pop")]]
+lc_layers  <- r_all[[str_detect(names(r_all), "LandCover")]]
+
+rcl_matrix <- matrix(c(15, 16, 1, 1, 13, 2, 13, 14, 2), ncol = 3, byrow = TRUE)
+lc_binary  <- classify(lc_layers, rcl_matrix, others = NA)
+
+# get first layer
+lc_2020_name <- names(lc_binary)[str_detect(names(lc_binary), "2020")]
+pop_2020_name <- names(pop_layers)[str_detect(names(pop_layers), "2020")]
+
+is_populated_2020 <- classify(pop_layers[[pop_2020_name]], matrix(c(-Inf, 1, 0, 1, Inf, 1), ncol=3, byrow=TRUE))
+
+# extract Counts for each category
+lc_pop_2020 <- mask(lc_binary[[lc_2020_name]], is_populated_2020, maskvalues = 0)
+f_pop <- freq(lc_pop_2020)
+counts_pop_2020 <- c(Desert = f_pop$count[f_pop$value == 1], Vegetated = f_pop$count[f_pop$value == 2])
+
+lc_unpop_2020 <- mask(lc_binary[[lc_2020_name]], is_populated_2020, maskvalues = 1)
+f_unpop <- freq(lc_unpop_2020)
+counts_unpop_2020 <- c(Desert = f_unpop$count[f_unpop$value == 1], Vegetated = f_unpop$count[f_unpop$value == 2])
+
+
+project_40_years <- function(start_counts, transition_matrix) {
+  years <- 0:40
+  results <- data.frame(Year = 2020 + years, Desert = 0, Vegetated = 0)
+  
+  v <- matrix(start_counts, nrow = 1)
+  for (i in seq_along(years)) {
+
+    future_v <- v %*% (transition_matrix %^% (i - 1))
+    results[i, c("Desert", "Vegetated")] <- as.numeric(future_v)
+  }
+  return(results)
+}
+
+# run projections
+proj_human <- project_40_years(counts_pop_2020, results_late$Populated)
+proj_wild  <- project_40_years(counts_unpop_2020, results_late$Unpopulated)
+
+# plotting
+proj_human$Zone <- "Populated (Human)"
+proj_wild$Zone  <- "Unpopulated (Wild)"
+full_projection <- rbind(proj_human, proj_wild)
+
+
+plot_df <- full_projection %>%
+  pivot_longer(cols = c(Desert, Vegetated), names_to = "Class", values_to = "Pixels")
+
+ggplot(plot_df, aes(x = Year, y = Pixels, color = Class, linetype = Zone)) +
+  geom_line(linewidth = 1) +
+  scale_color_manual(values = c("Desert" = "#d8b365", "Vegetated" = "#1a9850")) +
+  theme_minimal() +
+  labs(title = paste0(current_country, ": 2020-2060 Projection"),
+       subtitle = "Human-managed areas vs. Wilderness dynamics",
+       y = "Total Pixel Count",
+       x = "Year") +
+  facet_wrap(~Zone, scales = "free_y")
+```

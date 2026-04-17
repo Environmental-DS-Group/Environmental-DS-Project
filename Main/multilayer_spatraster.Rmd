@@ -1,0 +1,348 @@
+---
+title: "multilayer_spatraster"
+output: html_document
+date: "2026-03-02"
+---
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(terra)
+library(stringr)
+library(gt)
+library(ggplot2)
+library(tidyr)
+library(data.table)
+
+root_dir <- "C:/Users/erikg/Downloads/desert_project/"
+```
+
+
+Making a master file of all values with all years
+Implementation:
+- using the average of all months to represent each year for NDVI, EVI and night/day temperatures
+- selecting data from 2001-2023, since this is where all of our data overlaps.
+```{r}
+compute_yearly_average <- function(r_folder, year, template) {
+  if (r_folder == "Precipitation/") {year = paste0("^3B-MO\\.MS\\.MRG\\.3IMERG\\.", year)} # Ensure correct parsing for Precipitation
+  files <- list.files(path = paste0(root_dir, r_folder),
+                      pattern = paste0(year),
+                      full.names = TRUE,
+                      recursive = TRUE)
+  
+  r <- rast(files)
+  
+  # Align to template (same extent/resolution/projection)
+  r <- project(r, template)   # project/resample if necessary
+  r <- resample(r, template)  # make sure resolution matches
+
+  mean_r <- app(r, fun=mean, na.rm=TRUE)
+  mean_r
+}
+
+# Create a template using the first raster (LandCover 2001)
+template_file <- list.files(path = paste0(root_dir, "LandCover_Senegal/"),
+                            pattern = "2001",
+                            full.names = TRUE,
+                            recursive = TRUE)[1]
+template <- rast(template_file)
+
+
+r <- list()
+for (r_folder in c("LandCover_Senegal/", "Vegetation_Senegal/NDVI/", "Vegetation_Senegal/EVI/", "Temperature_Senegal/Day/", "Temperature_Senegal/Night/", "Precipitation_Senegal/", "Pop/")) {
+  for (year in 2001:2023) {
+    yearly_avg <- compute_yearly_average(r_folder, year, template)
+    r[[length(r) + 1]] <- yearly_avg
+    print(paste0(r_folder, year))
+  }
+}
+
+r <- rast(r)
+names(r)
+
+raster_names <- list()
+for (r_folder_name in c("LandCover", "NDVI", "EVI", "DayTemp", "NightTemp", "Precip", "Pop")) {
+  for (year in 2001:2023) {
+    raster_names[[length(raster_names) + 1]] <- paste0(r_folder_name, "_", year)
+  }
+}
+
+names(r) <- raster_names
+
+writeRaster(r, filename = paste0(root_dir, "SenegalData.tif"), overwrite = TRUE)
+```
+
+The same with chad
+```{r}
+compute_yearly_average <- function(r_folder, year, template) {
+  if (r_folder == "Precipitation/") {year = paste0("^3B-MO\\.MS\\.MRG\\.3IMERG\\.", year)} # Ensure correct parsing for Precipitation
+  files <- list.files(path = paste0(root_dir, r_folder),
+                      pattern = paste0(year),
+                      full.names = TRUE,
+                      recursive = TRUE)
+  
+  r <- rast(files)
+  
+  # Align to template (same extent/resolution/projection)
+  r <- project(r, template)   # project/resample if necessary
+  r <- resample(r, template)  # make sure resolution matches
+
+  mean_r <- app(r, fun=mean, na.rm=TRUE)
+  mean_r
+}
+
+# Create a template using the first raster (LandCover 2001)
+template_file <- list.files(path = paste0(root_dir, "LandCover_Chad/"),
+                            pattern = "2001",
+                            full.names = TRUE,
+                            recursive = TRUE)[1]
+template <- rast(template_file)
+
+
+r <- list()
+for (r_folder in c("LandCover_Chad/", "Vegetation_Chad/NDVI/", "Vegetation_Chad/EVI/", "Temperature_Chad/Day/", "Temperature_Chad/Night/", "Precipitation_Chad/", "Pop/")) {
+  for (year in 2001:2023) {
+    yearly_avg <- compute_yearly_average(r_folder, year, template)
+    r[[length(r) + 1]] <- yearly_avg
+    print(paste0(r_folder, year))
+  }
+}
+
+r <- rast(r)
+names(r)
+
+r <- rast(paste0(root_dir, "ChadData.tif"))
+
+raster_names <- list()
+for (r_folder_name in c("LandCover", "NDVI", "EVI", "DayTemp", "NightTemp", "Precip", "Pop")) {
+  for (year in 2001:2023) {
+    raster_names[[length(raster_names) + 1]] <- paste0(r_folder_name, "_", year)
+  }
+}
+
+names(r) <- raster_names
+
+writeRaster(r, filename = paste0(root_dir, "ChadData2.tif"), overwrite = TRUE)
+```
+
+
+
+
+Adding the proportion of same (LC) state neighbors
+```{r}
+
+senegal_r <- rast("SenegalData.tif")
+
+for (year in 2001:2023) {
+  print(year)
+  r_year <- senegal_r[[paste0("LandCover_", year)]]
+  
+  prop_same <- function(x, ...) {
+    center <- x[ceiling(length(x)/2)]
+    mean(x == center, na.rm = TRUE)
+  }
+  
+  w <- matrix(1, 3, 3)
+  
+  r_prop <- focal(r_year, w=w, fun=prop_same, na.policy="omit", pad=TRUE)
+  
+  senegal_r <- c(senegal_r, r_prop)
+  
+  names(senegal_r)[nlyr(senegal_r)] <- paste0("SameStateNeighborProp_", year)
+}
+
+writeRaster(senegal_r, "SenegalData_WithProp.tif", overwrite=TRUE)
+
+
+
+
+
+
+senegal_r <- rast("ChadData.tif")
+
+for (year in 2001:2023) {
+  r_year <- senegal_r[[paste0("LandCover_", year)]]
+  
+  prop_same <- function(x, ...) {
+    center <- x[ceiling(length(x)/2)]
+    mean(x == center, na.rm = TRUE)
+  }
+  
+  w <- matrix(1, 3, 3)
+  
+  r_prop <- focal(r_year, w=w, fun=prop_same, na.policy="omit", pad=TRUE)
+  
+  senegal_r <- c(senegal_r, r_prop)
+  
+  names(senegal_r)[nlyr(senegal_r)] <- paste0("SameStateNeighborProp_", year)
+}
+
+writeRaster(senegal_r, "Chad Data_WithProp.tif", overwrite=TRUE)
+
+```
+
+
+
+
+adding precip data
+```{r}
+compute_yearly_average <- function(r_folder, year, template) {
+  if (r_folder == "Precipitation_Senegal/") {year = paste0("^3B-MO\\.MS\\.MRG\\.3IMERG\\.", year)} # Ensure correct parsing for Precipitation
+  files <- list.files(path = paste0(root_dir, r_folder),
+                      pattern = paste0(year),
+                      full.names = TRUE,
+                      recursive = TRUE)
+  
+  r <- rast(files)
+  
+  # Align to template (same extent/resolution/projection)
+  r <- project(r, template)   # project/resample if necessary
+  r <- resample(r, template)  # make sure resolution matches
+
+  mean_r <- app(r, fun=mean, na.rm=TRUE)
+  mean_r
+}
+
+# Create a template using the first raster (LandCover 2001)
+template_file <- list.files(path = paste0(root_dir, "LandCover_Senegal/"),
+                            pattern = "2001",
+                            full.names = TRUE,
+                            recursive = TRUE)[1]
+template <- rast(template_file)
+
+
+r <- list()
+for (r_folder in c( "Precipitation_Senegal/")) {
+  for (year in 2001:2023) {
+    yearly_avg <- compute_yearly_average(r_folder, year, template)
+    r[[length(r) + 1]] <- yearly_avg
+    print(paste0(r_folder, year))
+  }
+}
+
+r <- rast(r)
+names(r)
+
+raster_names <- list()
+for (r_folder_name in c("Precip")) {
+  for (year in 2001:2023) {
+    raster_names[[length(raster_names) + 1]] <- paste0(r_folder_name, "_", year)
+  }
+}
+
+names(r) <- raster_names
+
+writeRaster(r, filename = paste0(root_dir, "Precip_Senegal.tif"), overwrite = TRUE)
+
+
+
+
+
+r1 <- rast(paste0(root_dir, "SenegalData.tif"))
+names(r)
+r2 <- rast(paste0(root_dir, "Precip_Senegal.tif"))
+names(r2)
+
+
+
+# Get layer names
+n1 <- names(r1)
+n2 <- names(r2)
+
+# Find overlapping names
+overlap <- intersect(n1, n2)
+
+# Drop overlapping layers from r1
+r1_filtered <- r1[[!n1 %in% overlap]]
+
+# Combine (r2 replaces duplicates)
+result <- c(r1_filtered, r2)
+
+# Optional: reorder if you want consistent ordering
+result <- result[[order(names(result))]]
+
+writeRaster(result, "combined.tif", overwrite=TRUE)
+plot(result[["Precip_2001"]])
+
+
+
+
+
+compute_yearly_average <- function(r_folder, year, template) {
+  if (r_folder == "Precipitation_Chad/") {year = paste0("^3B-MO\\.MS\\.MRG\\.3IMERG\\.", year)} # Ensure correct parsing for Precipitation
+  files <- list.files(path = paste0(root_dir, r_folder),
+                      pattern = paste0(year),
+                      full.names = TRUE,
+                      recursive = TRUE)
+  
+  r <- rast(files)
+  
+  # Align to template (same extent/resolution/projection)
+  r <- project(r, template)   # project/resample if necessary
+  r <- resample(r, template)  # make sure resolution matches
+
+  mean_r <- app(r, fun=mean, na.rm=TRUE)
+  mean_r
+}
+
+# Create a template using the first raster (LandCover 2001)
+template_file <- list.files(path = paste0(root_dir, "LandCover_Chad/"),
+                            pattern = "2001",
+                            full.names = TRUE,
+                            recursive = TRUE)[1]
+template <- rast(template_file)
+
+
+r <- list()
+for (r_folder in c( "Precipitation_Chad/")) {
+  for (year in 2001:2023) {
+    yearly_avg <- compute_yearly_average(r_folder, year, template)
+    r[[length(r) + 1]] <- yearly_avg
+    print(paste0(r_folder, year))
+  }
+}
+
+r <- rast(r)
+names(r)
+
+raster_names <- list()
+for (r_folder_name in c("Precip")) {
+  for (year in 2001:2023) {
+    raster_names[[length(raster_names) + 1]] <- paste0(r_folder_name, "_", year)
+  }
+}
+
+names(r) <- raster_names
+
+writeRaster(r, filename = paste0(root_dir, "Precip_Chad.tif"), overwrite = TRUE)
+
+
+r1 <- rast(paste0(root_dir, "ChadData.tif"))
+names(r)
+r2 <- rast(paste0(root_dir, "Precip_Chad.tif"))
+names(r2)
+
+
+
+# Get layer names
+n1 <- names(r1)
+n2 <- names(r2)
+
+# Find overlapping names
+overlap <- intersect(n1, n2)
+
+# Drop overlapping layers from r1
+r1_filtered <- r1[[!n1 %in% overlap]]
+
+# Combine (r2 replaces duplicates)
+result <- c(r1_filtered, r2)
+
+# Optional: reorder if you want consistent ordering
+result <- result[[order(names(result))]]
+
+writeRaster(result, "combinedchad.tif", overwrite=TRUE)
+
+
+
+
+```
