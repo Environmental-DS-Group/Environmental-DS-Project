@@ -1,0 +1,207 @@
+---
+title: "DATA-399 (project)"
+output: html_document
+---
+
+
+# Test Code for One File
+
+```{r}
+
+# Packages
+library(terra)
+library(rhdf5)
+
+# Paths
+
+hdf5_path  <- "/Users/miaparker/Desktop/Precipitation Data/GPM_3IMERGM_07-20260326_184742/3B-MO.MS.MRG.3IMERG.19980101-S000000-E235959.01.V07B.HDF5"
+
+modis_path = rast("/Users/miaparker/Desktop/LandCover/LC.h16.2001.tif") ## Different data to grab shape
+
+output_path <- "/Users/miaparker/Desktop/Precipitation Data/test.tif"
+
+# 1. Read HDF5 data
+
+hdf_file <- hdf5_path
+
+# Check structure if needed
+h5ls(hdf_file)
+
+
+precip <- h5read(hdf_file, "/Grid/precipitation")  # adjust path if needed
+lat <- h5read(hdf_file, "/Grid/lat")
+lon <- h5read(hdf_file, "/Grid/lon")
+
+
+diff(lat)[1:5]
+diff(lon)[1:5]
+
+# Convert to matrix
+precip <- precip[,,1]
+
+
+precip[precip < -9000] <- NA
+precip <- precip[nrow(precip):1, ]
+
+image(lat, lon, precip)
+
+
+# 2. Create raster in lat/lon
+
+r <- rast(
+  nrows = length(lat),
+  ncols = length(lon),
+  xmin = min(lon),
+  xmax = max(lon),
+  ymin = min(lat),
+  ymax = max(lat),
+  crs = "EPSG:4326"
+)
+
+values(r) <- precip
+
+
+plot(r, main = "GPM precipitation - tile region")
+
+
+
+# 3. Load MODIS reference raster
+
+modis <- modis_path
+
+
+
+# 4. Reproject + align to MODIS
+
+r_aligned <- project(
+  r,
+  modis,
+  method = "bilinear"   # nearest neighbor (preserves values)
+)
+
+plot(r_aligned)
+summary(values(r_aligned))
+
+# 5. Save output
+
+writeRaster(r_aligned, "/Users/miaparker/Desktop/Precipitation Data/test.tif", overwrite=TRUE)
+
+cat("Done! Output saved as imerg_matched.tif\n")
+```
+# Code for All Files
+```{r}
+
+# Paths
+
+hdf_dir <- "/Users/miaparker/Desktop/Precipitation Data/GPM_3IMERGM_07-20260326_183156"
+modis_path <- "/Users/miaparker/Desktop/LandCover/LC.h19.2001.tif"
+output_dir <- "/Users/miaparker/Desktop/Precipitation Data/output_tifs_Chad"
+
+dir.create(output_dir, showWarnings = FALSE)
+
+# Load MODIS once
+modis <- rast(modis_path)
+
+# Get all HDF5 files
+hdf_files <- list.files(hdf_dir, pattern = "\\.HDF5$", full.names = TRUE)
+
+
+# Loop through files
+
+for (file in hdf_files) {
+
+  cat("Processing:", basename(file), "\n")
+
+  # Read data
+
+  precip <- h5read(file, "/Grid/precipitation")
+  lat <- h5read(file, "/Grid/lat")
+  lon <- h5read(file, "/Grid/lon")
+
+  precip <- precip[,,1]
+
+  # Clean data
+  precip[precip < -9000] <- NA
+  precip <- precip[nrow(precip):1, ]
+
+
+  # Create raster
+
+  r <- rast(
+    nrows = length(lat),
+    ncols = length(lon),
+    xmin = min(lon),
+    xmax = max(lon),
+    ymin = min(lat),
+    ymax = max(lat),
+    crs = "EPSG:4326"
+  )
+
+  values(r) <- precip
+
+
+  # Align to MODIS
+
+  r_aligned <- project(
+    r,
+    modis,
+    method = "bilinear"
+  )
+
+
+  # Save output
+
+  out_name <- paste0(
+    tools::file_path_sans_ext(basename(file)),
+    ".tif"
+  )
+
+  out_path <- file.path(output_dir, out_name)
+
+  writeRaster(r_aligned, out_path, overwrite = TRUE)
+
+  cat("Saved:", out_name, "\n\n")
+}
+
+cat("ll files processed!\n")
+```
+
+
+
+
+# Check Placement on World
+```{r}
+library(terra)
+library(rnaturalearth)
+
+r_aligned = rast("/Users/miaparker/Desktop/LandCover/LC.h16.2001.tif")
+
+# ---- WORLD MAP ----
+world <- ne_countries(scale = "medium", returnclass = "sf")
+world_vect <- vect(world)
+world_vect <- project(world_vect, crs(r_aligned))
+
+
+# ---- CHECK CRS FIRST (CRITICAL) ----
+plot(r_aligned, col = hcl.colors(100, "YlGnBu", rev=TRUE), main = "IMERG aligned")
+plot(world_vect, add = TRUE, border = "black", lwd = 1)
+```
+
+
+# Compare Data Files
+```{r}
+
+plot(
+  r,
+  col = terrain.colors(50),
+  main = "IMERG Precipitation",
+  xlim = c(-30, 0),
+  ylim = c(0, 30)
+)
+plot(r_aligned)
+```
+
+
+
+
+
