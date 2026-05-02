@@ -9,6 +9,20 @@ For local communities, desertification is an immediate threat to food security, 
 
 ## Datasets
 
+### Population Counts / Unconstrained Global Mosaics
+Source: World Pop
+Access Link: [https://hub.worldpop.org/geodata/listing?id=64](https://hub.worldpop.org/geodata/listing?id=64)
+
+For every year from 2000-2020 (ordinal), we have the following data:
+
+| Variable        | Description | Data Type |
+|-----------------|-------------|-----------|
+| X  | Latitude | continuous |
+| Y | Longitude | continuous |
+| LC_Type1 | Land Cover Type 1: Annual International Geosphere-Biosphere Programme (IGBP) classification | nominal |
+| LC_Type2 | Land Cover Type 2: Annual University of Maryland (UMD) classification | nominal |
+| LC_Type3 | Land Cover Type 3: Annual Leaf Area Index (LAI) classification | nominal |
+
 ### MODIS/Terra+Aqua Land Cover Type Yearly L3 Global 500m SIN Grid V061 
 Source: Nasa  
 Access Link: [https://www.earthdata.nasa.gov/data/catalog/lpcloud-mcd12q1-061](https://www.earthdata.nasa.gov/data/catalog/lpcloud-mcd12q1-061)
@@ -51,16 +65,31 @@ For every year from 2000-2025 (ordinal), we have the following data:
 | LST_Night_6km | Night Land Surface Temperature | continuous |
 | Emis_31 | Band 31 emissivity useful for detecting shifts at desert margin | continuous |
 
-## How to access data
+### GPM IMERG Final Precipitation L3 1 month 0.1 degree x 0.1 degree V07 (GPM_3IMERGM) 
+Source: Nasa  
+Access Link: [https://disc.gsfc.nasa.gov/datasets/GPM_3IMERGM_07/summary](https://disc.gsfc.nasa.gov/datasets/GPM_3IMERGM_07/summary)
+
+For every year from 1998-2023 (ordinal), we have the following data:
+
+| Variable        | Description | Data Type |
+|-----------------|-------------|-----------|
+| X  | Latitude | continuous |
+| Y | Longitude | continuous |
+| Precipitation | Average Daily Precip. Rate | continuous |
+
+## How to access NASA data
 Select one of the following NASA Earthdata links:
 
 * [MCD12Q1 (Land Coverage Type)](https://www.earthdata.nasa.gov/data/catalog/lpcloud-mcd12q1-061)
 * [MOD13A3 (Vegetation Indices)](https://www.earthdata.nasa.gov/data/catalog/lpcloud-mod13a3-061)
 * [MOD11B3 (Temperature/Emissivity)](https://www.earthdata.nasa.gov/data/catalog/lpcloud-mod11b3-061)
+* [GPM_3IMERGM (Precipitation)](https://disc.gsfc.nasa.gov/datasets/GPM_3IMERGM_07/summary)
 
 Once on your chosen product page, you should find the __"Data Access"__ tab on the right side of the screen.
 
 Look for the row labeled __"Earthdata Search"__ and click the __"Download"__ button. This will open the global Earthdata Search map interface.
+
+## For MODIS Data Only: 
 
 In the top-left corner, underneath the main search bar, look for the __"Spatial"__ button.
 
@@ -69,6 +98,8 @@ Select __"Rectangle"__ from the drop-down menu.
 Click and drag on the map to draw a box over your area of interest (e.g., the Senegal region). This filters the thousands of global files to only those covering your specific coordinates.
 
 The matching files (granules) will appear in the sidebar.
+
+## For all NASA Data:
 
 Look for the __"Download All"__ button near the bottom-middle of the screen and click it.
 
@@ -81,3 +112,12 @@ You will be presented with several tabs. Select the __"Download Files"__ tab.
 Run the installer and authorize it with your Earthdata login. The software will create a folder in your designated directory and begin downloading the `.hdf` or `.tif` files.
 
 To use these files in R for example, a library package like `terra` will be needed.
+
+
+## Author Contributions
+
+Michael: Downloaded all MODIS data and reformatted, conducted exploritory analysis on the land cover data including graphs, and wrote Solution and Recomendation Section.
+
+Mia: Downloaded and reformatted IMERG Precipitation Data, conducted eda on land cover regarding Lake Chad including graphs, and wrote Background and Problem Section.
+
+Erik: Conducted the majority of data analysis regarding the markov chains and machine learning used for SSRD, and wrote the Conclusion section.
