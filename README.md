@@ -19,9 +19,7 @@ For every year from 2000-2020 (ordinal), we have the following data:
 |-----------------|-------------|-----------|
 | X  | Latitude | continuous |
 | Y | Longitude | continuous |
-| LC_Type1 | Land Cover Type 1: Annual International Geosphere-Biosphere Programme (IGBP) classification | nominal |
-| LC_Type2 | Land Cover Type 2: Annual University of Maryland (UMD) classification | nominal |
-| LC_Type3 | Land Cover Type 3: Annual Leaf Area Index (LAI) classification | nominal |
+| ppp_{year}_1km_Aggregated | Annual People per Pixel | continuous |
 
 ### MODIS/Terra+Aqua Land Cover Type Yearly L3 Global 500m SIN Grid V061 
 Source: Nasa  
