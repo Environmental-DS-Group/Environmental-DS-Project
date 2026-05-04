@@ -114,7 +114,7 @@ To use these files in R for example, a library package like `terra` will be need
 
 ## Author Contributions
 
-Michael: Downloaded all MODIS data and reformatted, conducted exploritory analysis on the land cover data including graphs, and wrote Solution and Recomendation Section.
+Michael: Downloaded all MODIS data and reformatted, conducted exploratory analysis on the land cover data including graphs, and wrote Solution and Recomendation Section.
 
 Mia: Downloaded and reformatted IMERG Precipitation Data, conducted eda on land cover regarding Lake Chad including graphs, and wrote Background and Problem Section.
 
